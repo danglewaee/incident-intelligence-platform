@@ -1,0 +1,31 @@
+services:
+  api:
+    image: python:3.11-slim
+    working_dir: /app
+    command: bash -lc "pip install --no-cache-dir -r requirements.txt && uvicorn main:app --host 0.0.0.0 --port 8000"
+    volumes:
+      - ./api:/app
+    ports:
+      - "9000:8000"
+
+  ingestor:
+    image: python:3.11-slim
+    working_dir: /ingestor
+    command: bash -lc "pip install --no-cache-dir -r requirements.txt && python mock_ingestor.py"
+    volumes:
+      - ./ingestor:/ingestor
+    environment:
+      API_URL: http://api:8000
+      INTERVAL_SECONDS: 3
+    depends_on:
+      - api
+
+  dashboard:
+    image: nginx:1.27-alpine
+    volumes:
+      - ./dashboard/index.html:/usr/share/nginx/html/index.html:ro
+      - ./dashboard/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - api
+    ports:
+      - "9010:80"
