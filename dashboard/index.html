@@ -3,18 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Incident Intelligence Console</title>
+    <title>AI Reliability Intelligence Platform</title>
     <style>
       :root {
-        --bg: #060c18;
-        --card: #0d1a33;
-        --line: rgba(255, 255, 255, 0.08);
-        --text: #e9f0ff;
-        --muted: #9bb0d3;
-        --green: #4dd99a;
-        --amber: #ffba49;
-        --red: #ff6978;
-        --cyan: #5fc5ff;
+        --bg: #061321;
+        --panel: #0f2136;
+        --line: rgba(255, 255, 255, 0.1);
+        --text: #f1f6ff;
+        --muted: #9fb6d8;
+        --green: #3ddc97;
+        --amber: #ffc857;
+        --red: #ff6b6b;
+        --blue: #66b3ff;
       }
       * { box-sizing: border-box; }
       body {
@@ -22,65 +22,120 @@
         font-family: "Segoe UI", sans-serif;
         color: var(--text);
         background:
-          radial-gradient(circle at 8% 0%, rgba(95, 197, 255, 0.15), transparent 50%),
-          radial-gradient(circle at 100% 0%, rgba(255, 105, 120, 0.12), transparent 50%),
+          radial-gradient(circle at 0% 0%, rgba(102, 179, 255, 0.22), transparent 45%),
+          radial-gradient(circle at 100% 0%, rgba(255, 107, 107, 0.14), transparent 45%),
           var(--bg);
       }
-      .wrap { width: min(1180px, 94vw); margin: 22px auto 34px; }
-      h1 { margin: 0; font-size: 2rem; }
-      .sub { color: var(--muted); margin-top: 5px; }
-      .row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
+      .wrap { width: min(1240px, 94vw); margin: 20px auto 30px; }
+      h1 { margin: 0; font-size: 1.9rem; }
+      .sub { color: var(--muted); margin-top: 4px; }
+      .grid4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
       .card {
-        background: var(--card);
+        background: var(--panel);
         border: 1px solid var(--line);
         border-radius: 14px;
         padding: 14px;
       }
-      .k { color: var(--muted); font-size: 0.8rem; }
-      .v { font-size: 1.9rem; font-weight: 700; margin-top: 3px; }
+      .k { color: var(--muted); font-size: 0.82rem; }
+      .v { font-size: 1.85rem; font-weight: 700; margin-top: 4px; }
+      .status {
+        display: inline-flex;
+        padding: 3px 9px;
+        border-radius: 999px;
+        font-size: 0.74rem;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        margin-top: 7px;
+      }
+      .healthy { background: rgba(61, 220, 151, 0.2); color: #c4ffdf; }
+      .degraded { background: rgba(255, 200, 87, 0.2); color: #ffe8b0; }
+      .critical { background: rgba(255, 107, 107, 0.2); color: #ffd2d2; }
+
       .layout { display: grid; grid-template-columns: 2fr 1fr; gap: 12px; margin-top: 12px; }
+      .layout2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
       .tbl { width: 100%; border-collapse: collapse; }
-      .tbl th, .tbl td { text-align: left; padding: 8px; border-bottom: 1px solid var(--line); font-size: 0.86rem; }
-      .badge { padding: 2px 8px; border-radius: 999px; font-size: 0.72rem; }
-      .sev-critical { background: rgba(255, 105, 120, 0.2); color: #ffc2cb; }
-      .sev-high { background: rgba(255, 186, 73, 0.22); color: #ffdca4; }
-      .sev-medium { background: rgba(95, 197, 255, 0.18); color: #cdeeff; }
-      .sev-low { background: rgba(77, 217, 154, 0.18); color: #bcffe1; }
-      .feed { max-height: 410px; overflow: auto; }
-      .event { border-bottom: 1px solid var(--line); padding: 8px 0; }
-      .event small { color: var(--muted); }
-      @media (max-width: 980px) {
-        .row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .tbl th, .tbl td {
+        text-align: left;
+        padding: 8px;
+        border-bottom: 1px solid var(--line);
+        font-size: 0.83rem;
+      }
+      .tbl th { color: #c3d7f5; font-size: 0.77rem; text-transform: uppercase; letter-spacing: 0.03em; }
+      .badge { padding: 2px 8px; border-radius: 999px; font-size: 0.7rem; }
+      .sev-critical { background: rgba(255, 107, 107, 0.2); color: #ffd3d3; }
+      .sev-high { background: rgba(255, 200, 87, 0.24); color: #ffe8b0; }
+      .sev-medium { background: rgba(102, 179, 255, 0.24); color: #d7ebff; }
+      .sev-low { background: rgba(61, 220, 151, 0.22); color: #c4ffdf; }
+
+      .feed, .timeline {
+        max-height: 365px;
+        overflow: auto;
+      }
+      .item {
+        border-bottom: 1px solid var(--line);
+        padding: 8px 0;
+      }
+      .item b { font-size: 0.86rem; }
+      .item small { color: var(--muted); }
+
+      .root-row {
+        display: grid;
+        grid-template-columns: 1.4fr 0.5fr 0.5fr;
+        gap: 8px;
+        border-bottom: 1px solid var(--line);
+        padding: 8px 0;
+        font-size: 0.84rem;
+      }
+
+      @media (max-width: 1024px) {
+        .grid4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         .layout { grid-template-columns: 1fr; }
+        .layout2 { grid-template-columns: 1fr; }
       }
     </style>
   </head>
   <body>
     <main class="wrap">
-      <h1>Incident Intelligence Console</h1>
-      <div class="sub">Realtime incident clustering, deploy regression signals, triage metrics</div>
+      <h1>AI Reliability Intelligence Platform</h1>
+      <div class="sub">Detect anomalies, correlate multi-service failures, rank root causes, and flag deploy regressions</div>
 
-      <section class="row">
-        <article class="card"><div class="k">Open Incidents</div><div class="v" id="openInc">-</div></article>
-        <article class="card"><div class="k">Mitigated</div><div class="v" id="mitigated">-</div></article>
-        <article class="card"><div class="k">Mean Confidence</div><div class="v" id="conf">-</div></article>
+      <section class="grid4">
+        <article class="card">
+          <div class="k">System Status</div>
+          <div class="v" id="systemStatusText">-</div>
+          <div id="systemStatusBadge" class="status healthy">HEALTHY</div>
+        </article>
+        <article class="card"><div class="k">Active Incidents</div><div class="v" id="openInc">-</div></article>
+        <article class="card"><div class="k">Active Anomalies (20m)</div><div class="v" id="activeAnom">-</div></article>
         <article class="card"><div class="k">Est. MTTR (min)</div><div class="v" id="mttr">-</div></article>
       </section>
 
       <section class="layout">
         <article class="card">
-          <h3 style="margin-top:0;">Active Incidents</h3>
+          <h3 style="margin-top:0;">Incident View</h3>
           <table class="tbl">
             <thead>
-              <tr><th>ID</th><th>Service</th><th>Severity</th><th>Status</th><th>Confidence</th><th>Events</th></tr>
+              <tr><th>ID</th><th>Service</th><th>Severity</th><th>Score</th><th>Probable Root Cause</th><th>Events</th></tr>
             </thead>
             <tbody id="incRows"></tbody>
           </table>
         </article>
 
         <article class="card">
-          <h3 style="margin-top:0;">Live Event Feed</h3>
+          <h3 style="margin-top:0;">Live Event Stream</h3>
           <div id="feed" class="feed"></div>
+        </article>
+      </section>
+
+      <section class="layout2">
+        <article class="card">
+          <h3 style="margin-top:0;">Timeline View</h3>
+          <div id="timeline" class="timeline"></div>
+        </article>
+
+        <article class="card">
+          <h3 style="margin-top:0;">Root Cause Panel</h3>
+          <div id="rootPanel"></div>
         </article>
       </section>
     </main>
@@ -95,45 +150,85 @@
         return "sev-low";
       }
 
+      function statusClass(status) {
+        if (status === "critical") return "critical";
+        if (status === "degraded") return "degraded";
+        return "healthy";
+      }
+
       async function refresh() {
-        const [stats, incidents] = await Promise.all([
+        const [stats, incidents, timeline] = await Promise.all([
           fetch(`${API}/triage/stats`).then((r) => r.json()),
           fetch(`${API}/incidents`).then((r) => r.json()),
+          fetch(`${API}/timeline`).then((r) => r.json()),
         ]);
 
         document.getElementById("openInc").textContent = stats.open_incidents;
-        document.getElementById("mitigated").textContent = stats.mitigated_incidents;
-        document.getElementById("conf").textContent = stats.mean_confidence.toFixed(2);
+        document.getElementById("activeAnom").textContent = stats.active_anomalies;
         document.getElementById("mttr").textContent = stats.mttr_minutes_estimate.toFixed(1);
+
+        const statusText = stats.system_status.toUpperCase();
+        const statusBadge = document.getElementById("systemStatusBadge");
+        document.getElementById("systemStatusText").textContent = statusText;
+        statusBadge.textContent = statusText;
+        statusBadge.className = `status ${statusClass(stats.system_status)}`;
 
         const tbody = document.getElementById("incRows");
         tbody.innerHTML = "";
         for (const x of incidents.slice(0, 18)) {
           const tr = document.createElement("tr");
-          tr.innerHTML = `<td>#${x.id}</td><td>${x.service}</td><td><span class="badge ${sevClass(x.severity)}">${x.severity}</span></td><td>${x.status}</td><td>${x.confidence.toFixed(2)}</td><td>${x.linked_events}</td>`;
+          tr.innerHTML = `<td>#${x.id}</td><td>${x.service}</td><td><span class="badge ${sevClass(x.severity)}">${x.severity}</span></td><td>${x.severity_score.toFixed(1)}</td><td>${x.probable_root_cause || "-"}</td><td>${x.linked_events}</td>`;
           tbody.appendChild(tr);
+        }
+
+        const tl = document.getElementById("timeline");
+        tl.innerHTML = "";
+        for (const e of timeline.slice(0, 20)) {
+          const row = document.createElement("div");
+          row.className = "item";
+          row.innerHTML = `<div><b>${e.kind.toUpperCase()}</b> ${e.service}</div><small>${e.title}${e.score ? ` | score ${Number(e.score).toFixed(2)}` : ""}</small>`;
+          tl.appendChild(row);
+        }
+
+        const feed = document.getElementById("feed");
+        feed.innerHTML = "";
+        for (const e of timeline.slice(0, 25)) {
+          const row = document.createElement("div");
+          row.className = "item";
+          row.innerHTML = `<div><b>${e.service}</b> ${e.kind}</div><small>${e.title}</small>`;
+          feed.appendChild(row);
+        }
+
+        await refreshRootPanel(incidents);
+      }
+
+      async function refreshRootPanel(incidents) {
+        const panel = document.getElementById("rootPanel");
+        panel.innerHTML = "";
+
+        if (!incidents.length) {
+          panel.innerHTML = "<div class='item'><small>No incidents yet.</small></div>";
+          return;
+        }
+
+        const top = incidents[0];
+        const detail = await fetch(`${API}/incidents/${top.id}`).then((r) => r.json());
+
+        const head = document.createElement("div");
+        head.className = "item";
+        head.innerHTML = `<b>Incident #${detail.id}</b><br><small>${detail.title}</small>`;
+        panel.appendChild(head);
+
+        for (const c of detail.root_cause_ranking || []) {
+          const row = document.createElement("div");
+          row.className = "root-row";
+          row.innerHTML = `<div>${c.service}</div><div>${Number(c.score).toFixed(2)}</div><div>${Number(c.confidence).toFixed(2)}</div>`;
+          panel.appendChild(row);
         }
       }
 
-      function bindWs() {
-        const ws = new WebSocket("ws://127.0.0.1:9000/ws");
-        ws.onopen = () => ws.send("sub");
-        ws.onmessage = (evt) => {
-          const data = JSON.parse(evt.data);
-          const feed = document.getElementById("feed");
-          const row = document.createElement("div");
-          row.className = "event";
-          row.innerHTML = `<div><b>${data.service}</b> ${data.level}</div><small>incident #${data.incident_id}${data.regression_score ? ` | regression ${data.regression_score}` : ""}</small>`;
-          feed.prepend(row);
-          while (feed.children.length > 50) feed.removeChild(feed.lastChild);
-          refresh().catch(() => {});
-        };
-        ws.onclose = () => setTimeout(bindWs, 1200);
-      }
-
       refresh().catch(() => {});
-      setInterval(() => refresh().catch(() => {}), 5000);
-      bindWs();
+      setInterval(() => refresh().catch(() => {}), 4000);
     </script>
   </body>
 </html>
