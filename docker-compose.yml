@@ -1,24 +1,77 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: incident_intel
+      POSTGRES_USER: incident
+      POSTGRES_PASSWORD: incident
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  collector:
+    image: python:3.11-slim
+    working_dir: /app
+    command: bash -lc "pip install --no-cache-dir -r collector/requirements.txt -r api/requirements.txt && uvicorn collector.main:app --host 0.0.0.0 --port 8000"
+    volumes:
+      - ./:/app
+    environment:
+      DATABASE_URL: postgresql+psycopg://incident:incident@postgres:5432/incident_intel
+      REDIS_URL: redis://redis:6379/0
+      REDIS_STREAM_KEY: telemetry_events
+    depends_on:
+      - postgres
+      - redis
+    ports:
+      - "9001:8000"
+
+  processor:
+    image: python:3.11-slim
+    working_dir: /app
+    command: bash -lc "pip install --no-cache-dir -r processor/requirements.txt -r api/requirements.txt && python processor/worker.py"
+    volumes:
+      - ./:/app
+    environment:
+      DATABASE_URL: postgresql+psycopg://incident:incident@postgres:5432/incident_intel
+      REDIS_URL: redis://redis:6379/0
+      REDIS_STREAM_KEY: telemetry_events
+      REDIS_UPDATE_CHANNEL: incident_updates
+    depends_on:
+      - postgres
+      - redis
+      - collector
+
   api:
     image: python:3.11-slim
     working_dir: /app
-    command: bash -lc "pip install --no-cache-dir -r requirements.txt && uvicorn main:app --host 0.0.0.0 --port 8000"
+    command: bash -lc "pip install --no-cache-dir -r api/requirements.txt && uvicorn api.main:app --host 0.0.0.0 --port 8000"
     volumes:
-      - ./api:/app
+      - ./:/app
+    environment:
+      DATABASE_URL: postgresql+psycopg://incident:incident@postgres:5432/incident_intel
+    depends_on:
+      - postgres
+      - processor
     ports:
       - "9000:8000"
 
   ingestor:
     image: python:3.11-slim
-    working_dir: /ingestor
-    command: bash -lc "pip install --no-cache-dir -r requirements.txt && python mock_ingestor.py"
+    working_dir: /app
+    command: bash -lc "pip install --no-cache-dir -r ingestor/requirements.txt && python ingestor/mock_ingestor.py"
     volumes:
-      - ./ingestor:/ingestor
+      - ./:/app
     environment:
-      API_URL: http://api:8000
+      API_URL: http://collector:8000
       INTERVAL_SECONDS: 3
     depends_on:
-      - api
+      - collector
 
   dashboard:
     image: nginx:1.27-alpine
@@ -29,3 +82,18 @@ services:
       - api
     ports:
       - "9010:80"
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+    volumes:
+      - ./infra/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      - collector
+      - api
+    ports:
+      - "9090:9090"
+
+volumes:
+  pg_data:

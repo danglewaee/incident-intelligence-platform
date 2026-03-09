@@ -1,0 +1,3 @@
+SQLAlchemy==2.0.43
+redis==6.4.0
+psycopg[binary]==3.2.10
