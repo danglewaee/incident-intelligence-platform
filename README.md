@@ -7,14 +7,14 @@ Build an AI-driven platform that ingests telemetry from distributed services, de
 ```text
 ingestor -> collector -> Redis Stream -> processor -> PostgreSQL -> api -> dashboard
                                     |
-                                    -> deploy/anomaly/incident intelligence engine
+                                    -> anomaly / clustering / root-cause / deploy-regression engine
 ```
 
 ## Why this project is strong
-- Distributed event-driven backend (`collector`, `stream`, `worker`)
-- Incident intelligence logic (anomaly detection, correlation, root-cause ranking)
-- Production-focused signals (deployment regression + severity triage)
-- End-to-end observability UX (overview, timeline, incident intelligence panel)
+- Distributed event-driven backend (`collector`, `Redis Streams`, `worker`)
+- Incident intelligence logic with both statistical and ML anomaly layers
+- Graph-based root-cause reasoning using dependency structure
+- End-to-end observability UX + monitoring stack (`Prometheus`, `Grafana`)
 
 ## Services
 - `collector/`: FastAPI telemetry collector (`POST /events`) + stream publisher
@@ -22,7 +22,15 @@ ingestor -> collector -> Redis Stream -> processor -> PostgreSQL -> api -> dashb
 - `api/`: read/query API for incidents, anomalies, regressions, timeline
 - `ingestor/`: simulated multi-service telemetry generator with injected failure scenarios
 - `dashboard/`: UI for live reliability intelligence
-- infra: `postgres`, `redis`, `prometheus`
+- infra: `postgres`, `redis`, `prometheus`, `grafana`
+
+## Diversified tech stack
+- Backend/API: `Python`, `FastAPI`, `SQLAlchemy`
+- Data/stream: `PostgreSQL`, `Redis Streams`
+- ML/analytics: `scikit-learn` (Isolation Forest), `NumPy`, `Pandas`
+- Graph reasoning: `NetworkX`
+- Observability: `Prometheus`, `Grafana`
+- Infra: `Docker Compose`, `Nginx`
 
 ## Simulated playground and failures
 Simulated services:
@@ -49,6 +57,7 @@ docker compose up --build
 - API docs: http://localhost:9000/docs
 - Dashboard: http://localhost:9010
 - Prometheus: http://localhost:9090
+- Grafana: http://localhost:3000 (admin/admin)
 
 ## Key endpoints
 Collector:
@@ -63,13 +72,16 @@ API:
 - `GET /triage/stats`
 
 ## Intelligence logic
-- Anomaly detection: latency z-score + rolling error-rate jump
+- Anomaly detection:
+  - statistical: latency z-score + rolling error-rate jump
+  - ML: Isolation Forest on service health vectors
 - Incident clustering:
   - rule baseline (service + window + pattern)
   - similarity layer for correlated message grouping
 - Root cause ranking via weighted heuristic:
   - temporal precedence
   - upstream dependency weight
+  - graph centrality boost (NetworkX)
   - anomaly strength
   - deployment proximity
   - event concentration
