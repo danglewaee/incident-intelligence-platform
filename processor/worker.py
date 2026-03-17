@@ -12,7 +12,7 @@ from api.analyzer_core import (
     detect_regression,
     refresh_incident_intelligence,
 )
-from api.database import Base, SessionLocal, engine
+from api.database import SessionLocal, ensure_schema
 from api.models import ServiceEvent
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
@@ -21,7 +21,7 @@ REDIS_UPDATE_CHANNEL = os.getenv("REDIS_UPDATE_CHANNEL", "incident_updates")
 POLL_BLOCK_MS = int(os.getenv("POLL_BLOCK_MS", "4000"))
 
 redis_client = redis.Redis.from_url(REDIS_URL, decode_responses=True)
-Base.metadata.create_all(bind=engine)
+ensure_schema()
 
 
 def _parse_ts(value: str | None) -> datetime:

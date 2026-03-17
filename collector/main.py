@@ -7,7 +7,7 @@ from fastapi import FastAPI, Response
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from sqlalchemy.orm import Session
 
-from api.database import Base, SessionLocal, engine
+from api.database import SessionLocal, ensure_schema
 from api.models import RawTelemetryEvent
 from api.schemas import EventIn, IngestAck
 
@@ -17,7 +17,7 @@ REDIS_STREAM_KEY = os.getenv("REDIS_STREAM_KEY", "telemetry_events")
 redis_client = redis.Redis.from_url(REDIS_URL, decode_responses=True)
 app = FastAPI(title="Telemetry Collector", version="0.1.0")
 
-Base.metadata.create_all(bind=engine)
+ensure_schema()
 
 
 def _ts(value: datetime | None) -> datetime:

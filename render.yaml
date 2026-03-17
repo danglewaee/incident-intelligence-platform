@@ -1,17 +1,17 @@
 databases:
-  - name: ai-reliability-postgres
+  - name: incident-intelligence-postgres
     databaseName: incident_intel
     user: incident
     plan: free
 
 services:
   - type: keyvalue
-    name: ai-reliability-redis
+    name: incident-intelligence-redis
     plan: free
     ipAllowList: []
 
   - type: pserv
-    name: ai-reliability-collector
+    name: incident-intelligence-collector
     runtime: python
     plan: starter
     buildCommand: pip install -r collector/requirements.txt -r api/requirements.txt
@@ -19,18 +19,18 @@ services:
     envVars:
       - key: DATABASE_URL
         fromDatabase:
-          name: ai-reliability-postgres
+          name: incident-intelligence-postgres
           property: connectionString
       - key: REDIS_URL
         fromService:
           type: keyvalue
-          name: ai-reliability-redis
+          name: incident-intelligence-redis
           property: connectionString
       - key: REDIS_STREAM_KEY
         value: telemetry_events
 
   - type: worker
-    name: ai-reliability-processor
+    name: incident-intelligence-processor
     runtime: python
     plan: starter
     buildCommand: pip install -r processor/requirements.txt -r api/requirements.txt
@@ -38,12 +38,12 @@ services:
     envVars:
       - key: DATABASE_URL
         fromDatabase:
-          name: ai-reliability-postgres
+          name: incident-intelligence-postgres
           property: connectionString
       - key: REDIS_URL
         fromService:
           type: keyvalue
-          name: ai-reliability-redis
+          name: incident-intelligence-redis
           property: connectionString
       - key: REDIS_STREAM_KEY
         value: telemetry_events
@@ -51,7 +51,7 @@ services:
         value: incident_updates
 
   - type: worker
-    name: ai-reliability-ingestor
+    name: incident-intelligence-ingestor
     runtime: python
     plan: starter
     buildCommand: pip install -r ingestor/requirements.txt
@@ -60,13 +60,13 @@ services:
       - key: COLLECTOR_HOSTPORT
         fromService:
           type: pserv
-          name: ai-reliability-collector
+          name: incident-intelligence-collector
           property: hostport
       - key: INTERVAL_SECONDS
         value: 4
 
   - type: web
-    name: ai-reliability-api
+    name: incident-intelligence-api
     runtime: python
     plan: free
     buildCommand: pip install -r api/requirements.txt
@@ -75,5 +75,5 @@ services:
     envVars:
       - key: DATABASE_URL
         fromDatabase:
-          name: ai-reliability-postgres
+          name: incident-intelligence-postgres
           property: connectionString

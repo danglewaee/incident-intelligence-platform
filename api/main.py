@@ -9,7 +9,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from api.analyzer_core import refresh_incident_intelligence
-from api.database import Base, engine, get_db
+from api.database import ensure_schema, get_db
 from api.models import AnomalySignal, Incident, IncidentEvent, RegressionSignal, ServiceEvent
 from api.schemas import (
     AnomalyOut,
@@ -20,7 +20,7 @@ from api.schemas import (
     TriageStats,
 )
 
-app = FastAPI(title="AI Reliability Intelligence Platform API", version="0.3.0")
+app = FastAPI(title="Incident Intelligence Platform API", version="0.3.0")
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DASHBOARD_INDEX = PROJECT_ROOT / "dashboard" / "index.html"
 
@@ -32,7 +32,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-Base.metadata.create_all(bind=engine)
+ensure_schema()
 
 
 @app.get("/", include_in_schema=False)
@@ -48,6 +48,10 @@ def health():
 @app.get("/metrics")
 def metrics():
     return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
+
+def _public_anomaly_score(score: float) -> float:
+    return round(max(0.0, min(float(score), 9.99)), 2)
 
 
 def _incident_out(db: Session, inc: Incident) -> IncidentOut:
@@ -128,7 +132,7 @@ def anomalies(db: Session = Depends(get_db)):
             service=x.service,
             metric=x.metric,
             method=x.method,
-            score=x.score,
+            score=_public_anomaly_score(x.score),
             details=x.details,
             created_at=x.created_at,
         )
@@ -165,7 +169,7 @@ def timeline(db: Session = Depends(get_db)):
                 kind="anomaly",
                 service=x.service,
                 title=f"{x.metric} anomaly ({x.method})",
-                score=x.score,
+                score=_public_anomaly_score(x.score),
                 timestamp=x.created_at,
             )
         )

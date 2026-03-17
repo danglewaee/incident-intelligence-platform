@@ -1,6 +1,6 @@
-# AI Reliability Intelligence Platform
+# Incident Intelligence Platform
 
-Build an AI-driven platform that ingests telemetry from distributed services, detects anomalies, clusters related failures into incidents, infers likely root causes, and surfaces actionable signals for faster production debugging.
+Build a platform that ingests telemetry from distributed services, detects anomalies, clusters related failures into incidents, infers likely root causes, and surfaces actionable signals for faster production debugging.
 
 ## Full Pipeline
 
@@ -59,7 +59,7 @@ Render deploy flow:
 - Push the repo/branch to GitHub.
 - In Render, choose `New +` -> `Blueprint` and select this repository.
 - Review the services from [render.yaml](render.yaml) and deploy.
-- Open the generated `ai-reliability-api` URL for the live dashboard and API.
+- Open the generated `incident-intelligence-api` URL for the live dashboard and API.
 
 Deployment note:
 - The cloud blueprint keeps the main demo path only: `collector`, `processor`, `ingestor`, `postgres`, `redis`, and one public `api` link.

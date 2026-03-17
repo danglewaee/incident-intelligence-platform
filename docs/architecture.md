@@ -1,7 +1,7 @@
 # System Architecture
 
 ## One-line project statement
-Build an AI-driven platform that ingests telemetry from distributed services, detects anomalies, clusters related failures into incidents, infers likely root causes, and surfaces actionable signals for faster production debugging.
+Build a platform that ingests telemetry from distributed services, detects anomalies, clusters related failures into incidents, infers likely root causes, and surfaces actionable signals for faster production debugging.
 
 ## Architecture flow
 

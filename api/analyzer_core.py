@@ -72,6 +72,14 @@ def _confidence_from_event(message: str, level: str) -> float:
     return min(0.98, conf)
 
 
+def _error_rate_spike_score(current_rate: float, baseline_rate: float) -> float:
+    safe_baseline = max(0.05, baseline_rate)
+    relative_jump = max(0.0, current_rate - baseline_rate)
+    ratio_component = current_rate / safe_baseline
+    delta_component = relative_jump * 10.0
+    return min(9.99, ratio_component + delta_component)
+
+
 def _graph_centrality_boost(services: set[str]) -> dict[str, float]:
     if nx is None or not services:
         return {s: 0.0 for s in services}
@@ -152,7 +160,7 @@ def detect_anomaly(db: Session, event: ServiceEvent) -> list[AnomalySignal]:
     cur_rate = cur_err / cur_total
     prev_rate = prev_err / prev_total
     if cur_rate > 0.18 and cur_rate > (prev_rate + 0.12):
-        spike_score = (cur_rate + 1e-6) / (prev_rate + 1e-6)
+        spike_score = _error_rate_spike_score(cur_rate, prev_rate)
         anomalies.append(
             AnomalySignal(
                 event_id=event.id,
