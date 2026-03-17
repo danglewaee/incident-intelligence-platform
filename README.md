@@ -52,9 +52,23 @@ Injected scenarios:
 docker compose up --build
 ```
 
+## Deploy to a public link
+This repo now includes [render.yaml](render.yaml) for a Render Blueprint deploy. The `api` service serves the dashboard at `/`, so the deployed API URL is also the recruiter-facing demo link.
+
+Render deploy flow:
+- Push the repo/branch to GitHub.
+- In Render, choose `New +` -> `Blueprint` and select this repository.
+- Review the services from [render.yaml](render.yaml) and deploy.
+- Open the generated `ai-reliability-api` URL for the live dashboard and API.
+
+Deployment note:
+- The cloud blueprint keeps the main demo path only: `collector`, `processor`, `ingestor`, `postgres`, `redis`, and one public `api` link.
+- Local `prometheus`, `grafana`, and the standalone nginx `dashboard` service remain available in Docker Compose for local development.
+
 ## URLs
 - Collector health: http://localhost:9001/health
 - API docs: http://localhost:9000/docs
+- API + dashboard: http://localhost:9000/
 - Dashboard: http://localhost:9010
 - Prometheus: http://localhost:9090
 - Grafana: http://localhost:3000 (admin/admin)

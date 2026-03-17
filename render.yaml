@@ -1,0 +1,80 @@
+databases:
+  - name: ai-reliability-postgres
+    databaseName: incident_intel
+    user: incident
+    plan: free
+
+services:
+  - type: keyvalue
+    name: ai-reliability-redis
+    plan: free
+    ipAllowList: []
+
+  - type: pserv
+    name: ai-reliability-collector
+    runtime: python
+    plan: starter
+    buildCommand: pip install -r collector/requirements.txt -r api/requirements.txt
+    startCommand: uvicorn collector.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ai-reliability-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: ai-reliability-redis
+          property: connectionString
+      - key: REDIS_STREAM_KEY
+        value: telemetry_events
+
+  - type: worker
+    name: ai-reliability-processor
+    runtime: python
+    plan: starter
+    buildCommand: pip install -r processor/requirements.txt -r api/requirements.txt
+    startCommand: python processor/worker.py
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ai-reliability-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: ai-reliability-redis
+          property: connectionString
+      - key: REDIS_STREAM_KEY
+        value: telemetry_events
+      - key: REDIS_UPDATE_CHANNEL
+        value: incident_updates
+
+  - type: worker
+    name: ai-reliability-ingestor
+    runtime: python
+    plan: starter
+    buildCommand: pip install -r ingestor/requirements.txt
+    startCommand: python ingestor/mock_ingestor.py
+    envVars:
+      - key: COLLECTOR_HOSTPORT
+        fromService:
+          type: pserv
+          name: ai-reliability-collector
+          property: hostport
+      - key: INTERVAL_SECONDS
+        value: 4
+
+  - type: web
+    name: ai-reliability-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r api/requirements.txt
+    startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ai-reliability-postgres
+          property: connectionString

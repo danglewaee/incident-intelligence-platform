@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta
+from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Response
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from sqlalchemy import func
@@ -19,6 +21,8 @@ from api.schemas import (
 )
 
 app = FastAPI(title="AI Reliability Intelligence Platform API", version="0.3.0")
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+DASHBOARD_INDEX = PROJECT_ROOT / "dashboard" / "index.html"
 
 app.add_middleware(
     CORSMiddleware,
@@ -29,6 +33,11 @@ app.add_middleware(
 )
 
 Base.metadata.create_all(bind=engine)
+
+
+@app.get("/", include_in_schema=False)
+def dashboard():
+    return FileResponse(DASHBOARD_INDEX)
 
 
 @app.get("/health")

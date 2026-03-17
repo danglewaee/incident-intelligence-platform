@@ -141,7 +141,9 @@
     </main>
 
     <script>
-      const API = "http://127.0.0.1:9000";
+      const API =
+        window.__API_BASE_URL__ ||
+        (window.location.port === "9010" ? "http://127.0.0.1:9000" : window.location.origin);
 
       function sevClass(sev) {
         if (sev === "critical") return "sev-critical";
