@@ -16,7 +16,6 @@ services:
     plan: starter
     buildCommand: pip install -r collector/requirements.txt -r api/requirements.txt
     startCommand: uvicorn collector.main:app --host 0.0.0.0 --port $PORT
-    healthCheckPath: /health
     envVars:
       - key: DATABASE_URL
         fromDatabase:
