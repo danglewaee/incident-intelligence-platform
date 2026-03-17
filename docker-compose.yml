@@ -34,7 +34,7 @@ services:
   processor:
     image: python:3.11-slim
     working_dir: /app
-    command: bash -lc "pip install --no-cache-dir -r processor/requirements.txt -r api/requirements.txt && python processor/worker.py"
+    command: bash -lc "pip install --no-cache-dir -r processor/requirements.txt -r api/requirements.txt && python -m processor.worker"
     volumes:
       - ./:/app
     environment:
