@@ -1,10 +1,20 @@
 from collections import Counter
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from api.models import AnomalySignal, Incident, IncidentEvent, RegressionSignal, ServiceEvent
+
+try:
+    import networkx as nx
+except Exception:
+    nx = None
+
+try:
+    from processor.ml_anomaly import infer_iforest_anomaly
+except Exception:
+    infer_iforest_anomaly = None
 
 
 SERVICE_DEPENDENCY_GRAPH = {
@@ -62,6 +72,39 @@ def _confidence_from_event(message: str, level: str) -> float:
     return min(0.98, conf)
 
 
+def _error_rate_spike_score(current_rate: float, baseline_rate: float) -> float:
+    safe_baseline = max(0.05, baseline_rate)
+    relative_jump = max(0.0, current_rate - baseline_rate)
+    ratio_component = current_rate / safe_baseline
+    delta_component = relative_jump * 10.0
+    return min(9.99, ratio_component + delta_component)
+
+
+def _graph_centrality_boost(services: set[str]) -> dict[str, float]:
+    if nx is None or not services:
+        return {s: 0.0 for s in services}
+
+    graph = nx.DiGraph()
+    for caller, deps in SERVICE_DEPENDENCY_GRAPH.items():
+        for dep in deps:
+            graph.add_edge(caller, dep)
+
+    sub_nodes = set(services)
+    for svc in list(services):
+        sub_nodes.update(SERVICE_DEPENDENCY_GRAPH.get(svc, []))
+    sub = graph.subgraph(sub_nodes)
+
+    if sub.number_of_nodes() == 0:
+        return {s: 0.0 for s in services}
+
+    try:
+        centrality = nx.betweenness_centrality(sub)
+    except Exception:
+        return {s: 0.0 for s in services}
+
+    return {s: float(centrality.get(s, 0.0)) for s in services}
+
+
 def detect_anomaly(db: Session, event: ServiceEvent) -> list[AnomalySignal]:
     anomalies: list[AnomalySignal] = []
     history_cutoff = event.timestamp - timedelta(minutes=40)
@@ -111,13 +154,13 @@ def detect_anomaly(db: Session, event: ServiceEvent) -> list[AnomalySignal]:
 
     cur_total = current.count() or 1
     prev_total = prev.count() or 1
-    cur_err = current.filter(ServiceEvent.level.in_(["error", "critical"])) .count()
-    prev_err = prev.filter(ServiceEvent.level.in_(["error", "critical"])) .count()
+    cur_err = current.filter(ServiceEvent.level.in_(["error", "critical"])).count()
+    prev_err = prev.filter(ServiceEvent.level.in_(["error", "critical"])).count()
 
     cur_rate = cur_err / cur_total
     prev_rate = prev_err / prev_total
     if cur_rate > 0.18 and cur_rate > (prev_rate + 0.12):
-        spike_score = ((cur_rate + 1e-6) / (prev_rate + 1e-6))
+        spike_score = _error_rate_spike_score(cur_rate, prev_rate)
         anomalies.append(
             AnomalySignal(
                 event_id=event.id,
@@ -128,6 +171,33 @@ def detect_anomaly(db: Session, event: ServiceEvent) -> list[AnomalySignal]:
                 details=f"Error rate jump: {cur_rate:.2f} vs baseline {prev_rate:.2f}",
             )
         )
+
+    if infer_iforest_anomaly is not None:
+        history_rows = (
+            db.query(
+                ServiceEvent.latency_ms,
+                ServiceEvent.level,
+                ServiceEvent.metric_value,
+                ServiceEvent.deploy_tag,
+            )
+            .filter(ServiceEvent.service == event.service)
+            .filter(ServiceEvent.timestamp >= history_cutoff)
+            .filter(ServiceEvent.id != event.id)
+            .all()
+        )
+        candidate = (event.latency_ms, event.level, event.metric_value, 1 if event.deploy_tag else 0)
+        ml_score = infer_iforest_anomaly(history_rows, candidate)
+        if ml_score is not None and ml_score > 0.025:
+            anomalies.append(
+                AnomalySignal(
+                    event_id=event.id,
+                    service=event.service,
+                    metric="service_health",
+                    method="isolation_forest",
+                    score=round(float(ml_score), 4),
+                    details="ML anomaly on service health feature vector",
+                )
+            )
 
     for a in anomalies:
         db.add(a)
@@ -234,18 +304,14 @@ def detect_regression(db: Session, event: ServiceEvent) -> RegressionSignal | No
     baseline_count = baseline_query.count() or 1
     current_count = current_query.count() or 1
 
-    baseline_errors = baseline_query.filter(ServiceEvent.level.in_(["error", "critical"])) .count()
-    current_errors = current_query.filter(ServiceEvent.level.in_(["error", "critical"])) .count()
+    baseline_errors = baseline_query.filter(ServiceEvent.level.in_(["error", "critical"])).count()
+    current_errors = current_query.filter(ServiceEvent.level.in_(["error", "critical"])).count()
 
     baseline_rate = baseline_errors / baseline_count
     current_rate = current_errors / current_count
 
-    baseline_latency = float(
-        baseline_query.with_entities(func.avg(ServiceEvent.latency_ms)).scalar() or 0.0
-    )
-    current_latency = float(
-        current_query.with_entities(func.avg(ServiceEvent.latency_ms)).scalar() or 0.0
-    )
+    baseline_latency = float(baseline_query.with_entities(func.avg(ServiceEvent.latency_ms)).scalar() or 0.0)
+    current_latency = float(current_query.with_entities(func.avg(ServiceEvent.latency_ms)).scalar() or 0.0)
 
     if baseline_rate == 0 and current_rate == 0:
         return None
@@ -271,10 +337,7 @@ def detect_regression(db: Session, event: ServiceEvent) -> RegressionSignal | No
 
 
 def rank_root_causes(db: Session, incident: Incident, max_candidates: int = 4) -> list[dict]:
-    event_ids = [
-        x.event_id
-        for x in db.query(IncidentEvent).filter(IncidentEvent.incident_id == incident.id).all()
-    ]
+    event_ids = [x.event_id for x in db.query(IncidentEvent).filter(IncidentEvent.incident_id == incident.id).all()]
     if not event_ids:
         return []
 
@@ -290,6 +353,7 @@ def rank_root_causes(db: Session, incident: Incident, max_candidates: int = 4) -
     services = {x.service for x in events}
     first_seen = {s: min(e.timestamp for e in events if e.service == s) for s in services}
     service_event_counts = Counter([x.service for x in events])
+    graph_boost = _graph_centrality_boost(services)
 
     latest_anomaly = (
         db.query(AnomalySignal)
@@ -322,14 +386,23 @@ def rank_root_causes(db: Session, incident: Incident, max_candidates: int = 4) -
         anomaly_weight = min(2.2, anomaly_boost.get(service, 0.0) / 2.3)
         deploy_weight = 0.7 if service in deploy_hit else 0.0
         volume_weight = min(1.0, service_event_counts.get(service, 0) / 6.0)
+        centrality_weight = min(0.8, graph_boost.get(service, 0.0) * 3.0)
 
-        root_score = anomaly_weight + upstream_weight + deploy_weight + temporal_priority + volume_weight
-        confidence = min(0.98, 0.38 + (root_score / 5.0))
+        root_score = (
+            anomaly_weight
+            + upstream_weight
+            + deploy_weight
+            + temporal_priority
+            + volume_weight
+            + centrality_weight
+        )
+        confidence = min(0.98, 0.38 + (root_score / 5.8))
         evidence = [
             f"first_seen={ts.isoformat()}",
             f"event_count={service_event_counts.get(service, 0)}",
             f"anomaly_boost={anomaly_boost.get(service, 0.0):.2f}",
             f"deploy_proximity={'yes' if service in deploy_hit else 'no'}",
+            f"graph_centrality={graph_boost.get(service, 0.0):.3f}",
         ]
         ranked.append(
             {
@@ -344,11 +417,7 @@ def rank_root_causes(db: Session, incident: Incident, max_candidates: int = 4) -
     return ranked[:max_candidates]
 
 
-def compute_incident_severity_score(
-    db: Session,
-    incident: Incident,
-    root_ranking: list[dict],
-) -> float:
+def compute_incident_severity_score(db: Session, incident: Incident, root_ranking: list[dict]) -> float:
     linked_event_ids = [
         x.event_id
         for x in db.query(IncidentEvent).filter(IncidentEvent.incident_id == incident.id).all()

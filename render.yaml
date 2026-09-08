@@ -1,0 +1,79 @@
+databases:
+  - name: incident-intelligence-postgres
+    databaseName: incident_intel
+    user: incident
+    plan: free
+
+services:
+  - type: keyvalue
+    name: incident-intelligence-redis
+    plan: free
+    ipAllowList: []
+
+  - type: pserv
+    name: incident-intelligence-collector
+    runtime: python
+    plan: starter
+    buildCommand: pip install -r collector/requirements.txt -r api/requirements.txt
+    startCommand: uvicorn collector.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: incident-intelligence-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: incident-intelligence-redis
+          property: connectionString
+      - key: REDIS_STREAM_KEY
+        value: telemetry_events
+
+  - type: worker
+    name: incident-intelligence-processor
+    runtime: python
+    plan: starter
+    buildCommand: pip install -r processor/requirements.txt -r api/requirements.txt
+    startCommand: python -m processor.worker
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: incident-intelligence-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: incident-intelligence-redis
+          property: connectionString
+      - key: REDIS_STREAM_KEY
+        value: telemetry_events
+      - key: REDIS_UPDATE_CHANNEL
+        value: incident_updates
+
+  - type: worker
+    name: incident-intelligence-ingestor
+    runtime: python
+    plan: starter
+    buildCommand: pip install -r ingestor/requirements.txt
+    startCommand: python ingestor/mock_ingestor.py
+    envVars:
+      - key: COLLECTOR_HOSTPORT
+        fromService:
+          type: pserv
+          name: incident-intelligence-collector
+          property: hostport
+      - key: INTERVAL_SECONDS
+        value: 4
+
+  - type: web
+    name: incident-intelligence-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r api/requirements.txt && cd dashboard && corepack enable && pnpm install --frozen-lockfile && pnpm build
+    startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: incident-intelligence-postgres
+          property: connectionString

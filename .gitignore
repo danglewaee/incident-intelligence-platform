@@ -3,3 +3,7 @@ __pycache__/
 .env
 .venv/
 *.db
+.pnpm-store/
+node_modules/
+dist/
+*.tsbuildinfo

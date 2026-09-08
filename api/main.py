@@ -1,13 +1,15 @@
 from datetime import datetime, timedelta
+from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Response
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from api.analyzer_core import refresh_incident_intelligence
-from api.database import Base, engine, get_db
+from api.database import ensure_schema, get_db
 from api.models import AnomalySignal, Incident, IncidentEvent, RegressionSignal, ServiceEvent
 from api.schemas import (
     AnomalyOut,
@@ -18,7 +20,10 @@ from api.schemas import (
     TriageStats,
 )
 
-app = FastAPI(title="AI Reliability Intelligence Platform API", version="0.3.0")
+app = FastAPI(title="Incident Intelligence Platform API", version="0.3.0")
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+DASHBOARD_DIST = PROJECT_ROOT / "dashboard" / "dist"
+DASHBOARD_SOURCE_INDEX = PROJECT_ROOT / "dashboard" / "index.html"
 
 app.add_middleware(
     CORSMiddleware,
@@ -28,7 +33,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-Base.metadata.create_all(bind=engine)
+ensure_schema()
+
+
+@app.get("/", include_in_schema=False)
+def dashboard():
+    built_index = DASHBOARD_DIST / "index.html"
+    if built_index.exists():
+        return FileResponse(built_index)
+    return FileResponse(DASHBOARD_SOURCE_INDEX)
+
+
+@app.get("/assets/{asset_path:path}", include_in_schema=False)
+def dashboard_asset(asset_path: str):
+    asset = DASHBOARD_DIST / "assets" / asset_path
+    if not asset.exists():
+        raise HTTPException(status_code=404, detail="asset not found")
+    return FileResponse(asset)
 
 
 @app.get("/health")
@@ -39,6 +60,10 @@ def health():
 @app.get("/metrics")
 def metrics():
     return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
+
+def _public_anomaly_score(score: float) -> float:
+    return round(max(0.0, min(float(score), 9.99)), 2)
 
 
 def _incident_out(db: Session, inc: Incident) -> IncidentOut:
@@ -119,7 +144,7 @@ def anomalies(db: Session = Depends(get_db)):
             service=x.service,
             metric=x.metric,
             method=x.method,
-            score=x.score,
+            score=_public_anomaly_score(x.score),
             details=x.details,
             created_at=x.created_at,
         )
@@ -156,7 +181,7 @@ def timeline(db: Session = Depends(get_db)):
                 kind="anomaly",
                 service=x.service,
                 title=f"{x.metric} anomaly ({x.method})",
-                score=x.score,
+                score=_public_anomaly_score(x.score),
                 timestamp=x.created_at,
             )
         )

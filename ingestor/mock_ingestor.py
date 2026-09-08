@@ -5,7 +5,10 @@ from datetime import datetime
 
 import requests
 
-API_URL = os.getenv("API_URL", "http://collector:8000")
+COLLECTOR_HOSTPORT = os.getenv("COLLECTOR_HOSTPORT")
+API_URL = os.getenv("API_URL") or (
+    f"http://{COLLECTOR_HOSTPORT}" if COLLECTOR_HOSTPORT else "http://collector:8000"
+)
 INTERVAL_SECONDS = int(os.getenv("INTERVAL_SECONDS", "3"))
 
 SERVICES = [
