@@ -69,7 +69,7 @@ services:
     name: incident-intelligence-api
     runtime: python
     plan: free
-    buildCommand: pip install -r api/requirements.txt
+    buildCommand: pip install -r api/requirements.txt && cd dashboard && corepack enable && pnpm install --frozen-lockfile && pnpm build
     startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:

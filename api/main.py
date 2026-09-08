@@ -22,7 +22,8 @@ from api.schemas import (
 
 app = FastAPI(title="Incident Intelligence Platform API", version="0.3.0")
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-DASHBOARD_INDEX = PROJECT_ROOT / "dashboard" / "index.html"
+DASHBOARD_DIST = PROJECT_ROOT / "dashboard" / "dist"
+DASHBOARD_SOURCE_INDEX = PROJECT_ROOT / "dashboard" / "index.html"
 
 app.add_middleware(
     CORSMiddleware,
@@ -37,7 +38,18 @@ ensure_schema()
 
 @app.get("/", include_in_schema=False)
 def dashboard():
-    return FileResponse(DASHBOARD_INDEX)
+    built_index = DASHBOARD_DIST / "index.html"
+    if built_index.exists():
+        return FileResponse(built_index)
+    return FileResponse(DASHBOARD_SOURCE_INDEX)
+
+
+@app.get("/assets/{asset_path:path}", include_in_schema=False)
+def dashboard_asset(asset_path: str):
+    asset = DASHBOARD_DIST / "assets" / asset_path
+    if not asset.exists():
+        raise HTTPException(status_code=404, detail="asset not found")
+    return FileResponse(asset)
 
 
 @app.get("/health")

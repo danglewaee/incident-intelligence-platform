@@ -21,7 +21,7 @@ ingestor -> collector -> Redis Stream -> processor -> PostgreSQL -> api -> dashb
 - `processor/`: stream consumer worker (anomaly, clustering, root cause, regression, severity)
 - `api/`: read/query API for incidents, anomalies, regressions, timeline
 - `ingestor/`: simulated multi-service telemetry generator with injected failure scenarios
-- `dashboard/`: UI for live reliability intelligence
+- `dashboard/`: React + TypeScript UI for live reliability intelligence
 - infra: `postgres`, `redis`, `prometheus`, `grafana`
 
 ## Diversified tech stack
@@ -84,6 +84,13 @@ API:
 - `GET /regressions`
 - `GET /timeline`
 - `GET /triage/stats`
+
+## Frontend architecture
+The dashboard is a strict TypeScript React app built with Vite under `dashboard/`. Domain types live in `dashboard/src/types/domain.ts` and mirror the FastAPI response models in `api/schemas.py`; FastAPI also exposes `/openapi.json`, so generated API types can replace the manual domain file later if the project adopts an OpenAPI codegen step.
+
+HTTP communication is centralized in `dashboard/src/api/client.ts`. React components call the typed client for triage stats, incidents, incident details, anomalies, regressions, and timeline data instead of issuing ad hoc `fetch` calls.
+
+The current backend exposes REST polling, so the dashboard refreshes the typed REST resources every four seconds. WebSocket message shapes are still typed end-to-end in `dashboard/src/types/domain.ts` and parsed through `dashboard/src/api/websocket.ts`, ready for a future backend `/ws` route without changing component contracts.
 
 ## Intelligence logic
 - Anomaly detection:
