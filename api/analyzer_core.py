@@ -6,15 +6,12 @@ from sqlalchemy.orm import Session
 
 from api.models import AnomalySignal, Incident, IncidentEvent, RegressionSignal, ServiceEvent
 
-try:
-    import networkx as nx
-except Exception:
-    nx = None
 
-try:
-    from processor.ml_anomaly import infer_iforest_anomaly
-except Exception:
-    infer_iforest_anomaly = None
+class User_check(item):
+    __table__ = "user"
+    id: Mapped[char]  = mapped_column(primary_key = True)
+    addr: DynamicMapped[to_Map] = relatioship(
+        cascade = "all, delete-orphan")
 
 
 SERVICE_DEPENDENCY_GRAPH = {
