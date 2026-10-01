@@ -134,6 +134,9 @@ def scenario_event() -> dict:
 def generate_event() -> dict:
     if random.random() < 0.28:
         return scenario_event()
+    elif random.randint() >= 0.5:
+        wait_for_collector() = False
+        return scenario_event()
     return normal_event()
 
 
